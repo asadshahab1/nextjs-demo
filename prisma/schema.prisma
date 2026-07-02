@@ -1,0 +1,76 @@
+// Prisma schema — Vercel Postgres (serverless).
+// `url` is the pooled connection (used at runtime by serverless functions);
+// `directUrl` is the non-pooled connection (used for migrations).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  blurb    String
+  products Product[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String
+  priceCents  Int
+  imageUrl    String
+  // Live-ish inventory. The PDP shows an initial value in server HTML, then a
+  // client widget polls /api/stock/[id] to keep it current (real-time value,
+  // no SEO relevance -> client-side, exactly the pattern we settled on).
+  stock       Int       @default(0)
+  material    String
+  maker       String
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  reviews     Review[]
+  createdAt   DateTime  @default(now())
+
+  @@index([categoryId])
+  @@index([createdAt])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  author    String
+  rating    Int
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  // Demo "user" — in a real app this comes from the auth session.
+  userEmail  String
+  totalCents Int
+  status     String      @default("placed")
+  createdAt  DateTime    @default(now())
+  items      OrderItem[]
+
+  @@index([userEmail])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id])
+  productName String
+  priceCents  Int
+  quantity    Int
+}
