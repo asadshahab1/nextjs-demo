@@ -8,6 +8,8 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "picsum.photos" },
+      // Vercel Blob public URLs — sellers' uploaded photos live here.
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
     ],
     // Widths the optimizer will generate; keep tight to what the layout uses.
     deviceSizes: [360, 640, 828, 1080, 1200, 1920],

@@ -1,5 +1,28 @@
 // Streaming fallbacks. These render instantly inside <Suspense fallback=...>
 // while the async Server Component behind them is still fetching on the server.
+// They're also what the App Router shows during route transitions via the
+// per-route loading.tsx files under app/.
+
+export function ProductCardSkeleton() {
+  return (
+    <div aria-hidden>
+      <div className="skeleton aspect-square rounded-xl" />
+      <div className="skeleton h-4 w-2/3 rounded mt-3" />
+      <div className="skeleton h-3 w-1/3 rounded mt-2" />
+    </div>
+  );
+}
+
+export function ProductGridSkeleton({ count = 8 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-5" aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <ProductCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 export function ReviewsSkeleton() {
   return (
     <div className="space-y-4" aria-hidden>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kiln-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/Asad/Downloads/nextjsfiles/kiln/kiln", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

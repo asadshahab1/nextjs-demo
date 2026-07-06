@@ -64,19 +64,36 @@ export async function getRecommendations(productId: string, categoryId: string) 
 }
 
 // --- Search (SSR from ?q=) and typeahead (client -> /api/search) -----------
+// The query fans out over serverless Postgres — a hot Neon round-trip is
+// ~500ms, and users type fast. So we wrap the query in Next's data cache
+// keyed by the normalized term with a short TTL. This turns repeated typeahead
+// hits (across all users) into cache reads and cuts perceived latency after
+// the first query. Sellers uploading a new product bust everything via
+// revalidateTag("products") in the createProduct action.
+import { unstable_cache } from "next/cache";
+
+const searchCached = unstable_cache(
+  async (q: string) => {
+    return prisma.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+          { material: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      include: { category: true },
+      take: 20,
+    });
+  },
+  ["search-products"],
+  { revalidate: 60, tags: ["products"] }
+);
+
 export async function searchProducts(q: string) {
-  if (!q.trim()) return [];
-  return prisma.product.findMany({
-    where: {
-      OR: [
-        { name: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } },
-        { material: { contains: q, mode: "insensitive" } },
-      ],
-    },
-    include: { category: true },
-    take: 20,
-  });
+  const norm = q.trim().toLowerCase();
+  if (!norm) return [];
+  return searchCached(norm);
 }
 
 // --- Live stock (client polling) -------------------------------------------

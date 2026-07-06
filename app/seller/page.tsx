@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getAllProducts, formatPrice } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
+import { formatPrice } from "@/lib/data";
+import { getSession } from "@/lib/auth";
 import type { Metadata } from "next";
 
 // RENDERING STRATEGY: this is the surface where SSG is IRRELEVANT — private,
@@ -12,7 +14,15 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Seller central", robots: { index: false } };
 
 export default async function SellerPage() {
-  const products = await getAllProducts();
+  // Route access is enforced by app/seller/layout.tsx; we just need the id
+  // to scope the query to this seller's own products.
+  const session = (await getSession())!;
+
+  const products = await prisma.product.findMany({
+    where: { sellerId: session.userId },
+    include: { category: true },
+    orderBy: { createdAt: "desc" },
+  });
   return (
     <div className="mx-auto max-w-content px-5 py-12">
       <div className="flex items-center justify-between mb-8">

@@ -1,12 +1,18 @@
 "use client";
 
-// CLIENT COMPONENT: the upload form. On submit it calls the createProduct
-// SERVER ACTION, which writes to Postgres AND triggers on-demand revalidation
-// of the home + category + product pages. That's the freshness loop: a new
-// upload appears on the public ISR pages promptly without a full rebuild —
-// the thing that makes ISR viable at high upload volume.
+// CLIENT COMPONENT: the upload form. On submit it builds a FormData from the
+// controlled inputs + the file input, then calls the createProduct SERVER
+// ACTION. The action writes the row to Postgres, saves the photo under
+// public/uploads/, AND triggers on-demand revalidation of the home + category
+// + product pages. That's the freshness loop: a new upload appears on the
+// public ISR pages promptly without a full rebuild.
+//
+// NOTE: we deliberately do NOT use a <form> element here. Next auto-wires
+// imported server actions into any surrounding <form> for progressive
+// enhancement — which submits the form natively before our JS handler can
+// preventDefault. Building the FormData imperatively side-steps that.
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createProduct } from "@/app/actions/products";
 
@@ -14,6 +20,8 @@ export default function NewProductPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -27,7 +35,25 @@ export default function NewProductPage() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const onImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    setPreview(f ? URL.createObjectURL(f) : null);
+  };
+
   const field = "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-pine outline-none";
+
+  const submit = () => {
+    startTransition(async () => {
+      setError(null);
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(form)) fd.set(k, v);
+      const file = fileRef.current?.files?.[0];
+      if (file) fd.set("image", file);
+      const res = await createProduct(fd);
+      if (res.ok) router.push(`/product/${res.id}`);
+      else setError(res.error);
+    });
+  };
 
   return (
     <div className="mx-auto max-w-lg px-5 py-12">
@@ -72,26 +98,32 @@ export default function NewProductPage() {
           </select>
         </label>
 
+        <label className="block">
+          <span className="text-sm text-smoke">Photo</span>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={onImage}
+            className="block w-full text-sm text-smoke file:mr-4 file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:text-porcelain hover:file:bg-pine"
+          />
+          <span className="text-xs text-smoke mt-1 block">Optional. JPEG/PNG/WebP/GIF, up to 5 MB. A placeholder is used if you skip this.</span>
+        </label>
+
+        {preview && (
+          <div className="rounded-lg border border-line p-3">
+            <p className="text-xs text-smoke mb-2">Preview</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="Preview" className="max-h-56 rounded" />
+          </div>
+        )}
+
         {error && <p className="text-sm text-red-700">{error}</p>}
 
         <button
+          type="button"
           disabled={isPending || !form.name || !form.maker}
-          onClick={() =>
-            startTransition(async () => {
-              setError(null);
-              const res = await createProduct({
-                name: form.name,
-                description: form.description || "A handmade piece.",
-                priceDollars: Number(form.priceDollars),
-                stock: Number(form.stock),
-                material: form.material,
-                maker: form.maker,
-                categorySlug: form.categorySlug,
-              });
-              if (res.ok) router.push(`/product/${res.id}`);
-              else setError(res.error);
-            })
-          }
+          onClick={submit}
           className="w-full rounded-full bg-ink text-porcelain px-6 py-3 text-sm hover:bg-pine transition-colors disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save & publish"}

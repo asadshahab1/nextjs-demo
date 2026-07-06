@@ -1,21 +1,23 @@
 import { getOrdersForUser, formatPrice } from "@/lib/data";
+import { getSession } from "@/lib/auth";
 import type { Metadata } from "next";
 
 // RENDERING STRATEGY: SSR, personalized. Order history is per-user and should
 // be correct on first paint, so it's rendered on the server per request reading
-// the (demo) user. `force-dynamic` because the data is user-specific and live.
+// the session user. `force-dynamic` because the data is user-specific and live.
+// Route access is enforced by app/account/layout.tsx; we just need the session
+// email to scope the query.
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your orders", robots: { index: false } };
 
-const DEMO_EMAIL = "demo@kiln.shop"; // from the auth session in a real app
-
 export default async function OrdersPage() {
-  const orders = await getOrdersForUser(DEMO_EMAIL);
+  const session = (await getSession())!;
+  const orders = await getOrdersForUser(session.email);
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-display text-4xl mb-2">Your orders</h1>
-      <p className="text-smoke mb-10">Signed in as {DEMO_EMAIL}</p>
+      <p className="text-smoke mb-10">Signed in as {session.email}</p>
 
       {orders.length === 0 ? (
         <p className="text-smoke">No orders yet.</p>
